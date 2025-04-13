@@ -12,44 +12,105 @@ This project implements a Model Context Protocol (MCP) server that acts as a bri
 
 ## Installation
 
-```bash
-# Install from npm
-npm install linear-mcp-server
-
-# Or install globally
-npm install -g linear-mcp-server
-```
+No direct installation is needed. The package will be automatically downloaded and used by your Claude integration when configured properly.
 
 ## Setup
 
-1. Create a `.env` file with your Linear API key:
+1. Obtain a Linear API key from your Linear account settings.
 
-```
-LINEAR_API_KEY=your_linear_api_key_here
-```
-
-2. Obtain a Linear API key from your Linear account settings.
+2. Configure the MCP server in your Claude integration as shown below.
 
 ## Usage
 
-### As a library
+### Using with Claude Desktop App
 
-```javascript
-import { startServer } from 'linear-mcp-server';
+Add this to your MCP configuration JSON file:
 
-// Start the MCP server
-startServer();
+```json
+{
+  "mcpServers": {
+    "linear": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@larryhudson/linear-mcp-server"
+      ],
+      "env": {
+        "LINEAR_API_KEY": "<YOUR_API_KEY>"
+      }
+    }
+  }
+}
 ```
 
-### As a command-line tool
+### Using with VS Code
 
-If installed globally:
+Add this to your settings JSON file:
 
-```bash
-linear-mcp-server
+```json
+{
+  "mcp": {
+    "inputs": [
+      {
+        "type": "promptString",
+        "id": "linear_api_key",
+        "description": "Linear API Key",
+        "password": true
+      }
+    ],
+    "servers": {
+      "linear": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@larryhudson/linear-mcp-server"
+        ],
+        "env": {
+          "LINEAR_API_KEY": "${input:linear_api_key}"
+        }
+      }
+    }
+  }
+}
 ```
 
-This will start the MCP server that communicates with Claude through stdin/stdout.
+### Using with Claude VS Code Extension
+
+Add this to the MCP config JSON file:
+
+```json
+{
+  "mcpServers": {
+    "linear": {
+      "command": "npx",
+      "args": ["-y", "@larryhudson/linear-mcp-server"],
+      "env": {
+        "LINEAR_API_KEY": "<YOUR_API_KEY>"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
+### Using with Cursor IDE
+
+Add this to the MCP config JSON file:
+
+```json
+{
+  "mcpServers": {
+    "linear": {
+      "command": "npx",
+      "args": ["-y", "@larryhudson/linear-mcp-server"],
+      "env": {
+        "LINEAR_API_KEY": "<YOUR_API_KEY>"
+      }
+    }
+  }
+}
+```
 
 ### Environment Variables
 
@@ -120,7 +181,8 @@ This is a relatively simple Node.js application with a single main source file (
 
 ## Limitations and Potential Improvements
 
-- The API key is hardcoded rather than being stored in an environment variable
-- There's limited pagination support for large result sets
-- Error handling could be improved, especially for edge cases
-- The image downloading could benefit from caching and better MIME type detection
+- There's limited pagination support for large result sets (currently limited to 20 issues)
+- Error handling could be improved for various edge cases
+- The image downloading could benefit from better MIME type detection
+- Consider adding more tools for managing issues (updating status, changing assignees, etc.)
+- Support for attachments when creating issues or adding comments
