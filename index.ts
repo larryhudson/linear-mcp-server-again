@@ -10,6 +10,7 @@ import { createHash } from "crypto";
 import fetch from "node-fetch";
 import pMap from "p-map";
 import os from "os";
+import { IssueFilter } from "@linear/sdk/dist/_generated_documents.js";
 
 
 // Get Linear API key from environment variables
@@ -590,6 +591,157 @@ Use the team ID when creating a new issue with the create_issue tool.
         content: [{ 
           type: "text", 
           text: `Error fetching teams: ${error instanceof Error ? error.message : String(error)}` 
+        }]
+      };
+    }
+  }
+);
+
+server.tool(
+  "search_issues",
+  "Search for Linear issues with various filters",
+  {
+    is_unassigned: z.boolean().optional().nullable().describe("Filter for unassigned issues (true) or assigned issues (false)"),
+    team_identifier: z.string().optional().describe("Team identifier (e.g., 'ENG' for Engineering)"),
+    status: z.string().optional().describe("Status name to filter by (e.g., 'Todo', 'In Progress')"),
+    is_current_cycle: z.boolean().optional().describe("Filter for issues in the current cycle"),
+    limit: z.number().min(1).max(100).nullable().default(20).describe("Maximum number of issues to return (default: 20)")
+  },
+  async ({ is_unassigned, team_identifier, status, is_current_cycle, limit }) => {
+    try {
+      // Build the filter object based on provided parameters
+      const filter: IssueFilter = {};
+      
+      // Add unassigned filter if specified
+      if (is_unassigned !== undefined) {
+        filter.assignee = { null: is_unassigned };
+      }
+      
+      // Get team by identifier if provided
+      let teamId: string | undefined;
+      if (team_identifier) {
+        const teamsConnection = await linearClient.teams();
+        const teams = teamsConnection.nodes;
+        const team = teams.find(t => t.key.toLowerCase() === team_identifier.toLowerCase());
+        
+        if (!team) {
+          return {
+            isError: true,
+            content: [{ type: "text", text: `Team with identifier "${team_identifier}" not found` }]
+          };
+        }
+        
+        teamId = team.id;
+        filter.team = { id: { eq: teamId } };
+      }
+      
+      // Add status filter if provided
+      if (status) {
+        // First, get all available workflow states to find the one matching the provided status name
+        const workflowStatesQuery = teamId 
+          ? await linearClient.workflowStates({ filter: { team: { id: { eq: teamId } } } })
+          : await linearClient.workflowStates();
+          
+        const workflowStates = workflowStatesQuery.nodes;
+        const matchingState = workflowStates.find(
+          s => s.name.toLowerCase() === status.toLowerCase()
+        );
+        
+        if (!matchingState) {
+          return {
+            isError: true,
+            content: [{ type: "text", text: `Status "${status}" not found` }]
+          };
+        }
+        
+        filter.state = { id: { eq: matchingState.id } };
+      }
+      
+      // Add current cycle filter if specified
+      if (is_current_cycle !== undefined && is_current_cycle) {
+        // Get current active cycles
+        const cyclesQuery = teamId
+          ? await linearClient.cycles({ filter: { team: { id: { eq: teamId } }, isActive: { eq: true } } })
+          : await linearClient.cycles({ filter: { isActive: { eq: true } } });
+          
+        const activeCycles = cyclesQuery.nodes;
+        
+        if (activeCycles.length === 0) {
+          return {
+            isError: false,
+            content: [{ type: "text", text: "No active cycles found. Cannot filter by current cycle." }]
+          };
+        }
+        
+        const activeCycleIds = activeCycles.map(cycle => cycle.id);
+        filter.cycle = { id: { in: activeCycleIds } };
+      }
+      
+      // Fetch issues with the constructed filters
+      const issuesConnection = await linearClient.issues({
+        filter,
+        first: limit
+      });
+      
+      const issues = issuesConnection.nodes;
+      
+      if (issues.length === 0) {
+        return {
+          content: [{ type: "text", text: "No issues found matching the search criteria." }]
+        };
+      }
+      
+      // Get detailed information for each issue
+      const issueDetails = await pMap(issues, async (issue) => {
+        const [state, team, assignee] = await Promise.all([
+          issue.state,
+          issue.team,
+          issue.assignee
+        ]);
+        
+        let cycleName = "None";
+        if (issue.cycle) {
+          const cycle = await issue.cycle;
+          cycleName = cycle?.name || "Unknown";
+        }
+        
+        return {
+          identifier: issue.identifier,
+          title: issue.title,
+          stateName: state?.name || "Unknown",
+          teamName: team?.name || "Unknown",
+          priority: formatPriority(issue.priority),
+          assigneeName: assignee?.displayName || "Unassigned",
+          createdAt: new Date(issue.createdAt).toLocaleString(),
+          cycleName
+        };
+      }, { concurrency: 5 });
+
+      // Format the response as a list
+      const formattedIssues = `
+# Linear Issues Search Results (${issueDetails.length})
+${is_unassigned !== undefined ? `\nFiltered by: ${is_unassigned ? 'Unassigned' : 'Assigned'} issues` : ''}
+${team_identifier ? `\nTeam: ${team_identifier}` : ''}
+${status ? `\nStatus: ${status}` : ''}
+${is_current_cycle ? '\nIn current cycle only' : ''}
+
+${issueDetails.map(issue => `- **${issue.identifier}**: ${issue.title}
+  Status: ${issue.stateName} | Team: ${issue.teamName} | Priority: ${issue.priority}
+  Assignee: ${issue.assigneeName} | Created: ${issue.createdAt} | Cycle: ${issue.cycleName}`).join('\n\n')}
+
+For more details on any issue, use the get_ticket tool with the issue ID.
+`;
+
+      return {
+        content: [{ type: "text", text: formattedIssues }]
+      };
+    } catch (error) {
+      console.error("Error searching issues:", error);
+      return {
+        isError: true,
+        content: [{ 
+          type: "text", 
+          text: `Error searching issues: ${error instanceof Error ? error.message : String(error)}` 
         }]
       };
     }
