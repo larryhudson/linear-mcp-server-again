@@ -91,10 +91,10 @@ async function downloadImage(url: string): Promise<string | null> {
     }
     
     // Get the image data as buffer
-    const imageBuffer = await response.buffer();
+    const imageBuffer = await response.arrayBuffer();
     
     // Write to file
-    await fs.writeFile(filePath, imageBuffer);
+    await fs.writeFile(filePath, Buffer.from(imageBuffer));
     
     return filePath;
   } catch (error) {
@@ -180,7 +180,10 @@ server.tool(
       ]);
       
       // Fetch all comments
-      const comments = commentsConnection ? await commentsConnection.nodes : [];
+      const comments = commentsConnection ? commentsConnection.nodes : [];
+      // Reverse the list of comments to show the oldest first
+      comments.reverse()
+
       const commentDetails = await Promise.all(comments.map(async comment => {
         const user = await comment.user
         return {
@@ -197,7 +200,7 @@ server.tool(
 ## Status
 State: ${state?.name || "Unknown"}
 Priority: ${formatPriority(issue.priority)}
-Assignee: ${assignee?.name || "Unassigned"}
+Assignee: ${assignee?.displayName || "Unassigned"}
 Team: ${team?.name || "None"}
 Created: ${new Date(issue.createdAt).toLocaleString()}
 Updated: ${new Date(issue.updatedAt).toLocaleString()}
@@ -246,6 +249,14 @@ ${comment.body || "No comment body"}`
     }
   }
 );
+
+interface SubIssue {
+  identifier: string;
+  title: string;
+  stateName: string;
+  assigneeName: string;
+  priority: string;
+}
 
 // Define the get_my_issues tool
 server.tool(
@@ -313,7 +324,7 @@ server.tool(
         }
         
         // Get sub-issues with details if they exist
-        let subIssues = [];
+        let subIssues: SubIssue[] = [];
         const childrenConnection = await issue.children();
         if (childrenConnection && childrenConnection.nodes.length > 0) {
           // Get detailed information for each sub-issue
@@ -328,7 +339,7 @@ server.tool(
                 identifier: subIssue.identifier,
                 title: subIssue.title,
                 stateName: subState?.name || "Unknown",
-                assigneeName: subAssignee?.name || "Unassigned",
+                assigneeName: subAssignee?.displayName || "Unassigned",
                 priority: formatPriority(subIssue.priority)
               };
             })
@@ -505,7 +516,7 @@ server.tool(
 Status: ${state?.name || "Unknown"}
 Team: ${team?.name || "Unknown"}
 Priority: ${formatPriority(issue.priority)}
-Assignee: ${assignee?.name || "Unassigned"}
+Assignee: ${assignee?.displayName || "Unassigned"}
 ${parentIssue ? `Parent Issue: ${parentIssue.identifier} - ${parentIssue.title}` : ''}
 Created: ${new Date(issue.createdAt).toLocaleString()}
 
