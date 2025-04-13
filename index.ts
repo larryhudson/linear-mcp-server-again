@@ -8,6 +8,7 @@ import path from "path";
 import { createHash } from "crypto";
 import fetch from "node-fetch";
 import { IssueFilter } from "@linear/sdk/dist/_generated_documents";
+import pMap from "p-map";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -297,13 +298,26 @@ server.tool(
         };
       }
       
-      // TODO(larryhudson): Probably throttle this
-      // Get issue details in parallel
-      const issueDetails = await Promise.all(issues.map(async issue => {
+      // Get issue details with limited concurrency to avoid rate limiting
+      const issueDetails = await pMap(issues, async (issue) => {
         const [state, team] = await Promise.all([
             issue.state,
             issue.team
         ]);
+        
+        // Get parent issue if exists
+        let parentIdentifier = null;
+        if (issue.parent) {
+          const parent = await issue.parent;
+          parentIdentifier = parent?.identifier || null;
+        }
+        
+        // Get sub-issues if exist
+        let subIssueCount = 0;
+        const childrenConnection = await issue.children();
+        if (childrenConnection) {
+          subIssueCount = childrenConnection.nodes.length;
+        }
         
         return {
           id: issue.id,
@@ -312,20 +326,30 @@ server.tool(
           stateName: state?.name || "Unknown",
           teamName: team?.name || "Unknown",
           priority: formatPriority(issue.priority),
-          updatedAt: new Date(issue.updatedAt).toLocaleString()
-          // TODO(larryhudson): Include parent issue
-          // TODO(larryhudson): Include sub issues
+          updatedAt: new Date(issue.updatedAt).toLocaleString(),
+          parentIssue: parentIdentifier,
+          subIssues: subIssueCount
         };
-      }));
+      }, { concurrency: 3 }); // Process 3 issues at a time
 
       // Format the response as a simple list
       const formattedIssues = `
 # Your ${state} Linear Issues (${issueDetails.length})
 
-${issueDetails.map(issue => 
-  `- **${issue.identifier}**: ${issue.title}
-  Status: ${issue.stateName} | Team: ${issue.teamName} | Priority: ${issue.priority} | Updated: ${issue.updatedAt}`
-).join('\n\n')}
+${issueDetails.map(issue => {
+  let details = `- **${issue.identifier}**: ${issue.title}
+  Status: ${issue.stateName} | Team: ${issue.teamName} | Priority: ${issue.priority} | Updated: ${issue.updatedAt}`;
+  
+  if (issue.parentIssue) {
+    details += `\n  Parent: ${issue.parentIssue}`;
+  }
+  
+  if (issue.subIssues > 0) {
+    details += `\n  Sub-issues: ${issue.subIssues}`;
+  }
+  
+  return details;
+}).join('\n\n')}
 
 For more details on any issue, use the get_ticket tool with the issue ID.
 `;
