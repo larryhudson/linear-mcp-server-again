@@ -193,6 +193,7 @@ Assignee: ${assignee?.displayName || "Unassigned"}
 Team: ${team?.name || "None"}
 Created: ${new Date(issue.createdAt).toLocaleString()}
 Updated: ${new Date(issue.updatedAt).toLocaleString()}
+Git branch name: ${issue.branchName}
 
 ## Description
 ${description || "No description provided."}
