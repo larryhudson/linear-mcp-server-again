@@ -1,6 +1,6 @@
 {
   "name": "@larryhudson/linear-mcp-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Model Context Protocol (MCP) server for Linear task management system",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +14,14 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["linear", "mcp", "claude", "ai", "task-management", "anthropic"],
+  "keywords": [
+    "linear",
+    "mcp",
+    "claude",
+    "ai",
+    "task-management",
+    "anthropic"
+  ],
   "author": "Larry Hudson <larryhudson@hey.com>",
   "license": "MIT",
   "type": "module",
