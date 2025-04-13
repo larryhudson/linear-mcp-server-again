@@ -422,8 +422,112 @@ server.tool(
   }
 );
 
-// TODO(larryhudson): Add a tool to create a new issue
+// Define the create_issue tool
+server.tool(
+  "create_issue",
+  "Create a new Linear issue",
+  {
+    team_id: z.string().describe("The Linear team ID (required)"),
+    title: z.string().describe("The title of the issue"),
+    description: z.string().optional().describe("The description of the issue (optional)"),
+    priority: z.number().min(0).max(4).optional().describe("Priority level (0-4): 0=No priority, 1=Urgent, 2=High, 3=Medium, 4=Low"),
+    assignee_id: z.string().optional().describe("The ID of the user to assign (optional)")
+  },
+  async ({ team_id, title, description, priority, assignee_id }) => {
+    try {
+      // Create the issue
+      const issueResult = await linearClient.issueCreate({
+        teamId: team_id,
+        title,
+        description: description || "",
+        priority,
+        assigneeId: assignee_id
+      });
+      
+      if (!issueResult.success || !issueResult.issue) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: "Failed to create issue" }]
+        };
+      }
+      
+      const issue = issueResult.issue;
+      const [state, team, assignee] = await Promise.all([
+        issue.state,
+        issue.team,
+        issue.assignee
+      ]);
+      
+      const formattedIssue = `
+# Issue Created: ${issue.identifier} - ${issue.title}
 
+Status: ${state?.name || "Unknown"}
+Team: ${team?.name || "Unknown"}
+Priority: ${formatPriority(issue.priority)}
+Assignee: ${assignee?.name || "Unassigned"}
+Created: ${new Date(issue.createdAt).toLocaleString()}
+
+## Description
+${issue.description || "No description provided."}
+
+Use the get_ticket tool with ID ${issue.identifier} to view this issue in detail.
+`;
+      
+      return {
+        content: [{ type: "text", text: formattedIssue }]
+      };
+    } catch (error) {
+      console.error("Error creating issue:", error);
+      return {
+        isError: true,
+        content: [{ 
+          type: "text", 
+          text: `Error creating issue: ${error instanceof Error ? error.message : String(error)}` 
+        }]
+      };
+    }
+  }
+);
+
+// Define a tool to fetch teams for reference when creating issues
+server.tool(
+  "get_teams",
+  "Get available Linear teams",
+  {},
+  async () => {
+    try {
+      const teamsConnection = await linearClient.teams();
+      const teams = teamsConnection.nodes;
+      
+      if (teams.length === 0) {
+        return {
+          content: [{ type: "text", text: "No teams found in this workspace." }]
+        };
+      }
+      
+      const teamList = `
+# Available Linear Teams
+
+${teams.map(team => `- **${team.name}** (ID: ${team.id})`).join('\n')}
+
+Use the team ID when creating a new issue with the create_issue tool.
+`;
+      
+      return {
+        content: [{ type: "text", text: teamList }]
+      };
+    } catch (error) {
+      console.error("Error fetching teams:", error);
+      return {
+        isError: true,
+        content: [{ 
+          type: "text", 
+          text: `Error fetching teams: ${error instanceof Error ? error.message : String(error)}` 
+        }]
+      };
+    }
+  }
+);
 
 // Start the server
 async function main() {
