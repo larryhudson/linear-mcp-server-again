@@ -537,14 +537,28 @@ async function main() {
   console.error("Linear MCP Server running on stdio");
 }
 
-// TODO: execute this on 
+// Function to clean up temporary files on exit
 async function cleanup() {
   try {
     await fs.rm(TEMP_DIR, { recursive: true });
+    console.error("Cleaned up temporary files");
   } catch (error) {
     console.error("Failed to delete temp directory:", error);
   }
 }
+
+// Register cleanup handlers for graceful shutdown
+process.on('SIGINT', async () => {
+  console.error("Received SIGINT, cleaning up...");
+  await cleanup();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.error("Received SIGTERM, cleaning up...");
+  await cleanup();
+  process.exit(0);
+});
 
 main().catch(error => {
   console.error("Fatal error starting server:", error);
