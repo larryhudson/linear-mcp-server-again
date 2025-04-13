@@ -306,17 +306,33 @@ server.tool(
         ]);
         
         // Get parent issue if exists
-        let parentIdentifier = null;
+        let parentIdentifier: string | undefined;
         if (issue.parent) {
           const parent = await issue.parent;
-          parentIdentifier = parent?.identifier || null;
+          parentIdentifier = parent?.identifier;
         }
         
-        // Get sub-issues if exist
-        let subIssueCount = 0;
+        // Get sub-issues with details if they exist
+        let subIssues = [];
         const childrenConnection = await issue.children();
-        if (childrenConnection) {
-          subIssueCount = childrenConnection.nodes.length;
+        if (childrenConnection && childrenConnection.nodes.length > 0) {
+          // Get detailed information for each sub-issue
+          subIssues = await Promise.all(
+            childrenConnection.nodes.map(async (subIssue) => {
+              const [subState, subAssignee] = await Promise.all([
+                subIssue.state,
+                subIssue.assignee
+              ]);
+              
+              return {
+                identifier: subIssue.identifier,
+                title: subIssue.title,
+                stateName: subState?.name || "Unknown",
+                assigneeName: subAssignee?.name || "Unassigned",
+                priority: formatPriority(subIssue.priority)
+              };
+            })
+          );
         }
         
         return {
@@ -328,7 +344,7 @@ server.tool(
           priority: formatPriority(issue.priority),
           updatedAt: new Date(issue.updatedAt).toLocaleString(),
           parentIssue: parentIdentifier,
-          subIssues: subIssueCount
+          subIssues: subIssues
         };
       }, { concurrency: 3 }); // Process 3 issues at a time
 
@@ -344,8 +360,12 @@ ${issueDetails.map(issue => {
     details += `\n  Parent: ${issue.parentIssue}`;
   }
   
-  if (issue.subIssues > 0) {
-    details += `\n  Sub-issues: ${issue.subIssues}`;
+  if (issue.subIssues && issue.subIssues.length > 0) {
+    details += `\n  Sub-issues:`;
+    issue.subIssues.forEach(subIssue => {
+      details += `\n    - **${subIssue.identifier}**: ${subIssue.title}`;
+      details += `\n      Status: ${subIssue.stateName} | Assignee: ${subIssue.assigneeName} | Priority: ${subIssue.priority}`;
+    });
   }
   
   return details;
@@ -460,7 +480,7 @@ server.tool(
       }
       
       // Create the issue
-      const issueResult = await linearClient.issueCreate(createParams);
+      const issueResult = await linearClient.createIssue(createParams);
       
       if (!issueResult.success || !issueResult.issue) {
         return {
@@ -469,7 +489,7 @@ server.tool(
         };
       }
       
-      const issue = issueResult.issue;
+      const issue = await issueResult.issue;
       
       // Get issue details and potential parent issue
       const [state, team, assignee, parentIssue] = await Promise.all([
