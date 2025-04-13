@@ -4,6 +4,9 @@
   "description": "Model Context Protocol (MCP) server for Linear task management system",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "linear-mcp-server": "dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",

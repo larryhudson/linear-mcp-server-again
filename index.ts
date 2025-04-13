@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -575,8 +577,16 @@ async function main() {
 
 async function cleanup() {
   try {
-    await fs.rm(TEMP_DIR, { recursive: true });
-    console.error("Cleaned up temporary files");
+    // Check if directory exists before attempting to delete it
+    try {
+      await fs.access(TEMP_DIR);
+      // Directory exists, proceed with deletion
+      await fs.rm(TEMP_DIR, { recursive: true });
+      console.error("Cleaned up temporary files");
+    } catch {
+      // Directory doesn't exist, no need to delete
+      console.error("Temp directory doesn't exist, nothing to clean up");
+    }
   } catch (error) {
     console.error("Failed to delete temp directory:", error);
   }
