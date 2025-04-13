@@ -2,11 +2,58 @@
 
 ## Overview
 
-This project implements a Model Context Protocol (MCP) server that acts as a bridge between Claude and the Linear task/issue management system. It allows Claude to interact with Linear through three primary tools:
+This project implements a Model Context Protocol (MCP) server that acts as a bridge between Claude and the Linear task/issue management system. It allows Claude to interact with Linear through the following tools:
 
 1. **get_ticket** - Retrieve detailed information about a specific Linear ticket
 2. **get_my_issues** - List issues assigned to the current user with filtering by state
 3. **add_comment** - Add comments to Linear tickets
+4. **create_issue** - Create a new issue in Linear
+5. **get_teams** - Retrieve available teams for reference
+
+## Installation
+
+```bash
+# Install from npm
+npm install linear-mcp-server
+
+# Or install globally
+npm install -g linear-mcp-server
+```
+
+## Setup
+
+1. Create a `.env` file with your Linear API key:
+
+```
+LINEAR_API_KEY=your_linear_api_key_here
+```
+
+2. Obtain a Linear API key from your Linear account settings.
+
+## Usage
+
+### As a library
+
+```javascript
+import { startServer } from 'linear-mcp-server';
+
+// Start the MCP server
+startServer();
+```
+
+### As a command-line tool
+
+If installed globally:
+
+```bash
+linear-mcp-server
+```
+
+This will start the MCP server that communicates with Claude through stdin/stdout.
+
+### Environment Variables
+
+- `LINEAR_API_KEY` - Your Linear API key (required)
 
 ## How It Works
 

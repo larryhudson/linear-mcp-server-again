@@ -1,0 +1,19 @@
+# Source code
+*.ts
+!*.d.ts
+
+# Development configs
+tsconfig.json
+.gitignore
+.github
+.vscode
+
+# Temp files
+temp_images/
+node_modules/
+.env
+
+# Test files
+__tests__/
+*.test.ts
+*.spec.ts
