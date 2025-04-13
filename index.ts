@@ -2,16 +2,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { LinearClient } from "@linear/sdk";
-import * as dotenv from "dotenv";
 import fs from "fs/promises";
 import path from "path";
 import { createHash } from "crypto";
 import fetch from "node-fetch";
-import { IssueFilter } from "@linear/sdk/dist/_generated_documents";
 import pMap from "p-map";
+import os from "os";
 
-// Load environment variables from .env file
-dotenv.config();
 
 // Get Linear API key from environment variables
 const LINEAR_API_KEY = process.env.LINEAR_API_KEY;
@@ -26,8 +23,7 @@ const linearClient = new LinearClient({
 });
 
 // Define a temporary directory for image downloads
-const cwd = process.cwd();
-const TEMP_DIR = path.join(cwd, "temp_images");
+const TEMP_DIR = path.join(os.tmpdir(), "linear-mcp-images");
 
 // Create the temp directory if it doesn't exist
 async function ensureTempDir() {
@@ -48,8 +44,6 @@ function extractImageUrls(markdown: string): string[] {
   while ((match = imageRegex.exec(markdown)) !== null) {
     urls.push(match[1]);
   }
-
-  console.log({urls})
 
   return urls;
 }
@@ -140,11 +134,10 @@ function formatPriority(priority: number | null): string {
 
 // Create an MCP server
 const server = new McpServer({
-  name: "Linear-MCP-Server",
-  version: "1.0.0"
+  name: "linear-mcp-server",
+  version: "0.1.0" 
 });
 
-// Define the get_ticket tool
 server.tool(
   "get_ticket",
   "Get a Linear ticket by ID",
@@ -156,7 +149,6 @@ server.tool(
       // Ensure temp directory exists
       await ensureTempDir();
       
-      // Query Linear API for ticket details
       const issue = await linearClient.issue(ticket_id);
       
       if (!issue) {
@@ -166,20 +158,16 @@ server.tool(
         };
       }
       
-      // Get issue details
       const commentsConnection = await issue.comments()
       
-      // Process the ticket description and download any images
       const { text: description, images } = await processMarkdownWithImages(issue.description || "");
       
-      // Get assignee, state, and team information
       const [assignee, state, team] = await Promise.all([
         issue.assignee,
         issue.state,
         issue.team
       ]);
       
-      // Fetch all comments
       const comments = commentsConnection ? commentsConnection.nodes : [];
       // Reverse the list of comments to show the oldest first
       comments.reverse()
@@ -193,7 +181,6 @@ server.tool(
         };
       }));
       
-      // Format the ticket details
       const formattedTicket = `
 # ${issue.identifier}: ${issue.title}
 
@@ -218,13 +205,13 @@ ${comment.body || "No comment body"}`
 `;
 
       // Prepare response with text and images
-      const content: any[] = [{ type: "text", text: formattedTicket }];
+      const contentBlocks: any[] = [{ type: "text", text: formattedTicket }];
       
       // Add images to response
       for (const image of images) {
         try {
           const imageData = await fs.readFile(image.path);
-          content.push({
+          contentBlocks.push({
             type: "image",
             data: imageData.toString("base64"),
             mimeType: image.url.toLowerCase().endsWith(".jpg") || image.url.toLowerCase().endsWith(".jpeg")
@@ -236,7 +223,7 @@ ${comment.body || "No comment body"}`
         }
       }
 
-      return { content };
+      return { content: contentBlocks };
     } catch (error) {
       console.error("Error fetching Linear ticket:", error);
       return {
@@ -258,7 +245,6 @@ interface SubIssue {
   priority: string;
 }
 
-// Define the get_my_issues tool
 server.tool(
   "get_my_issues",
   "Get your assigned Linear issues",
@@ -268,7 +254,6 @@ server.tool(
   },
   async ({ state }) => {
     try {
-      // Get current user
       const user = await linearClient.viewer;
       
       if (!user) {
@@ -278,9 +263,9 @@ server.tool(
         };
       }
       
-      // Set up filters based on state parameter
-      const filters: IssueFilter = {
-        assignee: { id: { eq: user.id } }
+      const filters = {
+        assignee: { id: { eq: user.id } },
+        state: {}
       };
       
       if (state !== "all") {
@@ -295,7 +280,6 @@ server.tool(
         }
       }
       
-      // Query issues
       const issuesConnection = await linearClient.issues({
         filter: filters,
         first: 20
@@ -309,21 +293,18 @@ server.tool(
         };
       }
       
-      // Get issue details with limited concurrency to avoid rate limiting
       const issueDetails = await pMap(issues, async (issue) => {
         const [state, team] = await Promise.all([
             issue.state,
             issue.team
         ]);
         
-        // Get parent issue if exists
         let parentIdentifier: string | undefined;
         if (issue.parent) {
           const parent = await issue.parent;
           parentIdentifier = parent?.identifier;
         }
         
-        // Get sub-issues with details if they exist
         let subIssues: SubIssue[] = [];
         const childrenConnection = await issue.children();
         if (childrenConnection && childrenConnection.nodes.length > 0) {
@@ -357,7 +338,7 @@ server.tool(
           parentIssue: parentIdentifier,
           subIssues: subIssues
         };
-      }, { concurrency: 3 }); // Process 3 issues at a time
+      }, { concurrency: 3 });
 
       // Format the response as a simple list
       const formattedIssues = `
@@ -401,7 +382,6 @@ For more details on any issue, use the get_ticket tool with the issue ID.
   }
 );
 
-// Define the add_comment tool
 server.tool(
   "add_comment",
   "Add a comment to a Linear ticket",
@@ -411,7 +391,6 @@ server.tool(
   },
   async ({ ticket_id, comment }) => {
     try {
-      // Get the issue
       const issue = await linearClient.issue(ticket_id);
       
       if (!issue) {
@@ -421,7 +400,6 @@ server.tool(
         };
       }
       
-      // Add the comment
       const newComment = await linearClient.createComment({
         issueId: issue.id,
         body: comment
@@ -453,7 +431,15 @@ server.tool(
   }
 );
 
-// Define the create_issue tool
+interface LinearIssueCreateParams {
+  teamId: string;
+  title: string;
+  description?: string;
+  priority?: number;
+  assigneeId?: string;
+  parentId?: string;
+}
+
 server.tool(
   "create_issue",
   "Create a new Linear issue",
@@ -467,8 +453,7 @@ server.tool(
   },
   async ({ team_id, title, description, priority, assignee_id, parent_issue_id }) => {
     try {
-      // Prepare create params
-      const createParams: any = {
+      const createParams: LinearIssueCreateParams = {
         teamId: team_id,
         title,
         description: description || "",
@@ -476,7 +461,7 @@ server.tool(
         assigneeId: assignee_id
       };
       
-      // If parent issue is specified, find it and add its ID
+      // If parent issue identifier is specified, find it and add its ID
       if (parent_issue_id) {
         const parentIssue = await linearClient.issue(parent_issue_id);
         
@@ -487,22 +472,23 @@ server.tool(
           };
         }
         
+        // Note that parentId is the UUID of the parent issue, not the identifier (e.g. LAR-14)
         createParams.parentId = parentIssue.id;
       }
       
       // Create the issue
-      const issueResult = await linearClient.createIssue(createParams);
+      const createResult = await linearClient.createIssue(createParams);
       
-      if (!issueResult.success || !issueResult.issue) {
+      if (!createResult.success || !createResult.issue) {
         return {
           isError: true,
           content: [{ type: "text", text: "Failed to create issue" }]
         };
       }
       
-      const issue = await issueResult.issue;
+      const issue = await createResult.issue;
       
-      // Get issue details and potential parent issue
+      // Get issue details
       const [state, team, assignee, parentIssue] = await Promise.all([
         issue.state,
         issue.team,
@@ -542,7 +528,6 @@ Use the get_ticket tool with ID ${issue.identifier} to view this issue in detail
   }
 );
 
-// Define a tool to fetch teams for reference when creating issues
 server.tool(
   "get_teams",
   "Get available Linear teams",
@@ -582,15 +567,12 @@ Use the team ID when creating a new issue with the create_issue tool.
   }
 );
 
-// Start the server
 async function main() {
-  // Connect to stdio transport
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("Linear MCP Server running on stdio");
 }
 
-// Function to clean up temporary files on exit
 async function cleanup() {
   try {
     await fs.rm(TEMP_DIR, { recursive: true });
@@ -600,7 +582,6 @@ async function cleanup() {
   }
 }
 
-// Register cleanup handlers for graceful shutdown
 process.on('SIGINT', async () => {
   console.error("Received SIGINT, cleaning up...");
   await cleanup();
