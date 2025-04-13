@@ -27,7 +27,6 @@
   "dependencies": {
     "@linear/sdk": "^39.0.0",
     "@modelcontextprotocol/sdk": "^1.9.0",
-    "dotenv": "^16.5.0",
     "node-fetch": "^3.3.2",
     "p-map": "^7.0.3",
     "zod": "^3.24.2"
