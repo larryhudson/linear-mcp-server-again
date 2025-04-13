@@ -318,18 +318,14 @@ server.tool(
         };
       }));
 
-      // TODO(larryhudson): Don't format it like this, this is harder to read
-      // Just do a simple list.
-      
-      // Format the response
+      // Format the response as a simple list
       const formattedIssues = `
 # Your ${state} Linear Issues (${issueDetails.length})
 
-| ID | Title | Status | Team | Priority | Last Updated |
-|---|---|---|---|---|---|
 ${issueDetails.map(issue => 
-  `| ${issue.identifier} | ${issue.title} | ${issue.stateName} | ${issue.teamName} | ${issue.priority} | ${issue.updatedAt} |`
-).join('\n')}
+  `- **${issue.identifier}**: ${issue.title}
+  Status: ${issue.stateName} | Team: ${issue.teamName} | Priority: ${issue.priority} | Updated: ${issue.updatedAt}`
+).join('\n\n')}
 
 For more details on any issue, use the get_ticket tool with the issue ID.
 `;
