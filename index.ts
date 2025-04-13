@@ -431,18 +431,36 @@ server.tool(
     title: z.string().describe("The title of the issue"),
     description: z.string().optional().describe("The description of the issue (optional)"),
     priority: z.number().min(0).max(4).optional().describe("Priority level (0-4): 0=No priority, 1=Urgent, 2=High, 3=Medium, 4=Low"),
-    assignee_id: z.string().optional().describe("The ID of the user to assign (optional)")
+    assignee_id: z.string().optional().describe("The ID of the user to assign (optional)"),
+    parent_issue_id: z.string().optional().describe("Parent issue identifier (e.g., LAR-14) to create this as a sub-issue (optional)")
   },
-  async ({ team_id, title, description, priority, assignee_id }) => {
+  async ({ team_id, title, description, priority, assignee_id, parent_issue_id }) => {
     try {
-      // Create the issue
-      const issueResult = await linearClient.issueCreate({
+      // Prepare create params
+      const createParams: any = {
         teamId: team_id,
         title,
         description: description || "",
         priority,
         assigneeId: assignee_id
-      });
+      };
+      
+      // If parent issue is specified, find it and add its ID
+      if (parent_issue_id) {
+        const parentIssue = await linearClient.issue(parent_issue_id);
+        
+        if (!parentIssue) {
+          return {
+            isError: true,
+            content: [{ type: "text", text: `Parent issue ${parent_issue_id} not found` }]
+          };
+        }
+        
+        createParams.parentId = parentIssue.id;
+      }
+      
+      // Create the issue
+      const issueResult = await linearClient.issueCreate(createParams);
       
       if (!issueResult.success || !issueResult.issue) {
         return {
@@ -452,10 +470,13 @@ server.tool(
       }
       
       const issue = issueResult.issue;
-      const [state, team, assignee] = await Promise.all([
+      
+      // Get issue details and potential parent issue
+      const [state, team, assignee, parentIssue] = await Promise.all([
         issue.state,
         issue.team,
-        issue.assignee
+        issue.assignee,
+        issue.parent
       ]);
       
       const formattedIssue = `
@@ -465,6 +486,7 @@ Status: ${state?.name || "Unknown"}
 Team: ${team?.name || "Unknown"}
 Priority: ${formatPriority(issue.priority)}
 Assignee: ${assignee?.name || "Unassigned"}
+${parentIssue ? `Parent Issue: ${parentIssue.identifier} - ${parentIssue.title}` : ''}
 Created: ${new Date(issue.createdAt).toLocaleString()}
 
 ## Description
