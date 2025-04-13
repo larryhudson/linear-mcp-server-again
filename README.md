@@ -14,36 +14,18 @@ This project implements a Model Context Protocol (MCP) server that acts as a bri
 
 No direct installation is needed. The package will be automatically downloaded and used by your Claude integration when configured properly.
 
-## Setup
-
-1. Obtain a Linear API key from your Linear account settings.
-
-2. Configure the MCP server in your Claude integration as shown below.
-
 ## Usage
 
-### Using with Claude Desktop App
+1. Obtain a Linear API key from your [Linear account settings](https://linear.app/larry-hudson/settings/account/security) - click 'New API key' under 'Personal API keys'.
 
-Add this to your MCP configuration JSON file:
+2. Configure the MCP server in your code editor as shown below.
 
-```json
-{
-  "mcpServers": {
-    "linear": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@larryhudson/linear-mcp-server"
-      ],
-      "env": {
-        "LINEAR_API_KEY": "<YOUR_API_KEY>"
-      }
-    }
-  }
-}
-```
 
 ### Using with VS Code
+
+One click install:
+
+[![Install with VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=linear&inputs=%5B%7B%22id%22%3A%22linear_api_key%22%2C%22type%22%3A%22promptString%22%2C%22description%22%3A%22Linear%20API%20Key%22%2C%22password%22%3Atrue%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40larryhudson%2Flinear-mcp-server%22%5D%2C%22env%22%3A%7B%22LINEAR_API_KEY%22%3A%22%24%7Binput%3Alinear_api_key%7D%22%7D%7D) [![Install with VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_Server-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=linear&inputs=%5B%7B%22id%22%3A%22linear_api_key%22%2C%22type%22%3A%22promptString%22%2C%22description%22%3A%22Linear%20API%20Key%22%2C%22password%22%3Atrue%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40larryhudson%2Flinear-mcp-server%22%5D%2C%22env%22%3A%7B%22LINEAR_API_KEY%22%3A%22%24%7Binput%3Alinear_api_key%7D%22%7D%7D&quality=insiders)
 
 Add this to your settings JSON file:
 
@@ -74,7 +56,47 @@ Add this to your settings JSON file:
 }
 ```
 
-### Using with Claude VS Code Extension
+### Using with Cursor IDE
+
+Add this to the MCP config JSON file:
+
+```json
+{
+  "mcpServers": {
+    "linear": {
+      "command": "npx",
+      "args": ["-y", "@larryhudson/linear-mcp-server"],
+      "env": {
+        "LINEAR_API_KEY": "<YOUR_API_KEY>"
+      }
+    }
+  }
+}
+```
+
+### Using with Claude Desktop App
+
+Add this to your MCP configuration JSON file:
+
+```json
+{
+  "mcpServers": {
+    "linear": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@larryhudson/linear-mcp-server"
+      ],
+      "env": {
+        "LINEAR_API_KEY": "<YOUR_API_KEY>"
+      }
+    }
+  }
+}
+```
+
+
+### Using with Cline VS Code Extension
 
 Add this to the MCP config JSON file:
 
@@ -94,23 +116,6 @@ Add this to the MCP config JSON file:
 }
 ```
 
-### Using with Cursor IDE
-
-Add this to the MCP config JSON file:
-
-```json
-{
-  "mcpServers": {
-    "linear": {
-      "command": "npx",
-      "args": ["-y", "@larryhudson/linear-mcp-server"],
-      "env": {
-        "LINEAR_API_KEY": "<YOUR_API_KEY>"
-      }
-    }
-  }
-}
-```
 
 ### Environment Variables
 
