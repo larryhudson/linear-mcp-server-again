@@ -182,6 +182,27 @@ server.tool(
           createdAt: comment.createdAt
         };
       }));
+
+      // Fetch child issues
+      const childIssues: SubIssue[] = [];
+      const childrenConnection = await issue.children();
+      if (childrenConnection && childrenConnection.nodes.length > 0) {
+        // Get detailed information for each child issue
+        for (const childIssue of childrenConnection.nodes) {
+          const [childState, childAssignee] = await Promise.all([
+            childIssue.state,
+            childIssue.assignee
+          ]);
+          
+          childIssues.push({
+            identifier: childIssue.identifier,
+            title: childIssue.title,
+            stateName: childState?.name || "Unknown",
+            assigneeName: childAssignee?.displayName || "Unassigned",
+            priority: formatPriority(childIssue.priority)
+          });
+        }
+      }
       
       const formattedTicket = `
 # ${issue.identifier}: ${issue.title}
@@ -197,6 +218,11 @@ Git branch name: ${issue.branchName}
 
 ## Description
 ${description || "No description provided."}
+
+${childIssues.length > 0 ? `## Child Issues (${childIssues.length})
+${childIssues.map(child => `- **${child.identifier}**: ${child.title}
+  Status: ${child.stateName} | Assignee: ${child.assigneeName} | Priority: ${child.priority}`).join('\n\n')}
+` : ''}
 
 ## Comments
 ${commentDetails.length > 0 
